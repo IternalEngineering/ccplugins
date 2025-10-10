@@ -1,4 +1,4 @@
-# Claude Code Plugin Marketplace
+# Iternal Code Plugin Marketplace
 
 A collection of custom plugins for [Claude Code](https://claude.ai/code) to enhance your development workflow.
 

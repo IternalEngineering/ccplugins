@@ -1,0 +1,24 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "iternal-plugins",
+  "version": "1.0.0",
+  "description": "Plugins for Iternal workflows",
+  "owner": {
+    "name": "Iternal",
+    "email": "barnaby@iternal.life"
+  },
+  "plugins": [
+
+    {
+      "name": "bell-normal",
+      "description": "Normal bell reminder hook that alerts a user that task has finished",
+      "version": "1.0.0",
+      "author": {
+        "name": "Barnaby Menage",
+        "email": "barnaby@iternal.life"
+      },
+      "source": "./plugins/bells",
+      "category": "productivity"
+    }
+  ]
+}

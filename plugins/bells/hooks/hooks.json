@@ -1,0 +1,16 @@
+{
+  "description": "Bell reminder hook that alerts when tasks are completed",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/bell_hooks.py"
+          }
+        ],
+        "matcher": "TodoWrite"
+      }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "bell-normal",
+  "version": "1.0.0",
+  "description": "Normal bell reminder hook that alerts a user that task has finished",
+  "author": {
+      "name": "Barnaby Menage",
+      "email": "barnaby@iternal.life"
+  }
+}

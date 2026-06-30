@@ -1,6 +1,6 @@
 ---
 name: iternal-agents
-description: Create and manage AI agents (chatbots/assistants), multi-step schedules, knowledge bases (RAG), and external-tool connections on the ITERNAL Agent Platform. Use when the user wants to build, configure, schedule, or tear down an ITERNAL agent/app — e.g. "make an agent that …", "schedule it weekly", "add documents to its knowledge base", or "connect Google Drive". Wraps the bundled `iternal` CLI (PAT-authenticated REST calls).
+description: Create and manage agents, schedules, knowledge bases (RAG), and external-tool connections on the hosted ITERNAL Agent Platform via a personal access token. Use when the user wants to build, configure, schedule, or tear down an ITERNAL agent/app as an end-user — e.g. "make an ITERNAL agent that …", "schedule my agent weekly", "add docs to my agent's knowledge base", "connect Google Drive to my agent". Wraps the bundled `iternal` CLI.
 ---
 
 # ITERNAL agents
@@ -9,18 +9,27 @@ Build and operate agents on the **ITERNAL Agent Platform**. An "agent" is an app
 model, optional tools (built-in + external SaaS via Composio), an optional knowledge base, and
 optional schedules. This skill drives the `iternal` CLI bundled with the plugin.
 
-## Setup (run once per shell)
+## Running the CLI — credentials on every call
 
-The CLI ships with this plugin. Alias it, and export your credentials:
+Shell state does **not** persist between commands, so the token must be present on **each**
+invocation. Either pass it inline:
 
 ```bash
-alias iternal='node "$CLAUDE_PLUGIN_ROOT/cli/iternal.mjs"'
-export ITERNAL_TOKEN="itl_pat_…"     # platform → Settings → Personal access tokens
-export ITERNAL_API_URL="https://agents-iternal.icmserver008.com"   # default; or http://localhost:3001
-iternal help
+ITERNAL_TOKEN="itl_pat_…" node "$CLAUDE_PLUGIN_ROOT/cli/iternal.mjs" agents list
 ```
 
-If `ITERNAL_TOKEN` is missing, ask the user to generate one — never invent or hardcode a token.
+…or write an env file once and `source` it **in the same command** as each call:
+
+```bash
+printf 'export ITERNAL_TOKEN=%q\nexport ITERNAL_API_URL=%q\n' "itl_pat_…" "https://agents-iternal.icmserver008.com" > .iternal.env
+source .iternal.env && node "$CLAUDE_PLUGIN_ROOT/cli/iternal.mjs" agents list
+```
+
+- Token: platform → **Settings → Personal access tokens**. If it's missing, ask the user — never
+  invent or hardcode a token.
+- `ITERNAL_API_URL` defaults to production; use `http://localhost:3001` for local dev.
+
+(Examples below write `iternal` for brevity — read it as `node "$CLAUDE_PLUGIN_ROOT/cli/iternal.mjs"`.)
 
 ## Commands
 
@@ -28,38 +37,55 @@ If `ITERNAL_TOKEN` is missing, ask the user to generate one — never invent or 
 iternal agents list | get <id> | delete <id>
 iternal agents create --name "Name" [--prompt "…"] [--model gpt-5] [--description "…"]
                       [--tool "Browse Web"]…  [--composio GOOGLEDRIVE_CREATE_FILE_FROM_TEXT]…
+iternal agents update <id> [--name "…"] [--prompt "…"] [--model "…"] [--description "…"]
 iternal schedule <agentId> --name "…" --instruction "…" --interval WEEKLY
 iternal tasks list <agentId> | delete <agentId> <taskId>
 iternal knowledge upload <agentId> --name doc.md [--text "…" | --file ./doc.md | --url https://…]
 iternal knowledge list <agentId> | delete <agentId> <sourceId>
-iternal composio connections | connect <toolkit>
+iternal composio tools | connections | connect <toolkit|slug>
 iternal models
 ```
 
-- Built-in `--tool`s: `Browse Web`, `URL Retrieval`, `Search Knowledge Base` (repeatable).
-- `--composio` slugs (repeatable): e.g. `GOOGLEDRIVE_CREATE_FILE_FROM_TEXT`, `GMAIL_SEND_EMAIL`.
-- Intervals: `EVERY_5_MIN`, `EVERY_15_MIN`, `EVERY_30_MIN`, `EVERY_HOUR`, `EVERY_6_HOURS`, `EVERY_12_HOURS`, `DAILY`, `WEEKLY`.
+## Tools & Composio slugs
 
-## Recipe: build → wire → schedule
+- **Built-in `--tool` names must be exact**: `Browse Web`, `URL Retrieval`, `Search Knowledge Base`
+  (repeatable). A wrong name is **rejected** — always read the `create` output: confirm each tool is
+  in the `— tools:` line, and that there is no `WARNING: rejected …` line.
+- **Composio `--composio` slugs**: discover valid ones with `iternal composio tools` (or the
+  platform's Connect UI). Don't invent slugs — confirm an unfamiliar one with the user. Default model
+  is `gpt-5` when `--model` is omitted (`iternal models` lists them).
+
+## Recipe: build → wire → connect → schedule
 
 ```bash
+# 1) create + enable tools — CHECK the output for any "WARNING: rejected"
 iternal agents create --name "AR Finder" \
   --prompt "Search the web for recent AR articles and save a brief to Google Drive. Complete autonomously." \
   --tool "Browse Web" --composio GOOGLEDRIVE_CREATE_FILE_FROM_TEXT
-#   → Created agent "AR Finder" (cmr0…)  — copy that id
+#   → Created agent "AR Finder" (cmr0…)
 
+# 2) connect the Composio toolkit (one-time OAuth) — give the user the URL to authorize
+iternal composio connect googledrive
+
+# 3) schedule it
 iternal schedule cmr0… --name "Weekly AR brief" \
   --instruction "Find recent AR articles, write a brief, save to Drive." --interval WEEKLY
 ```
 
 ## Important — flag these to the user
 
-- **Composio (Drive/Gmail/etc.) needs a one-time OAuth connection** you can't automate. Run
-  `iternal composio connect googledrive`, give the user the returned URL to authorize, then the tool
-  works. Until connected it returns `auth_required`. Check status with `iternal composio connections`.
-- **Creating an agent doesn't run it.** It runs when chatted with or when a schedule fires.
-- **`agents delete` and `knowledge delete` are permanent** — confirm with the user before deleting.
-- **Knowledge files** must be `.pdf/.txt/.md/.csv/.json`. `--file`/`--url` are guarded (no reading
+- **Composio toolkit = the lowercase prefix of the slug** (`GOOGLEDRIVE_…` → `googledrive`,
+  `GMAIL_…` → `gmail`); `composio connect` accepts either form. The OAuth authorize step **can't be
+  automated** — the user opens the returned URL. A scheduled agent using an **unconnected** Composio
+  tool **silently returns `auth_required`** and nothing visibly fails, so **connect before scheduling**
+  and verify with `iternal composio connections`.
+- **Creating an agent doesn't run it** — it runs when chatted with or when a schedule fires. Tools can
+  only be **added at create time**; `agents update` changes name/prompt/model/description but can't
+  remove tools.
+- **Knowledge indexing is async** — `upload` returns immediately; check `iternal knowledge list` for
+  `status: COMPLETED` before relying on retrieval.
+- **`agents delete` and `knowledge delete` are permanent** — confirm with the user first.
+- **Knowledge files** must be `.pdf/.txt/.md/.csv/.json`; `--file`/`--url` are guarded (no reading
   arbitrary local files, no private/loopback URLs).
 
 A PAT carries full account access — keep it secret; revoke it from Settings if leaked.

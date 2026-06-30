@@ -21,6 +21,16 @@ const MODELS = [
   "claude-opus-4-8", "claude-sonnet-4-6", "claude-opus-4-5", "gemini-2.5-pro",
   "deepseek-v4", "deepseek-r1", "qwen3-max", "glm-5.2", "kimi-k2", "minimax-m3",
 ];
+// Common Composio tool slugs (enable with --composio <SLUG>; connect the lowercase toolkit).
+const COMPOSIO_TOOLS = [
+  { slug: "GOOGLEDRIVE_CREATE_FILE_FROM_TEXT", toolkit: "googledrive", desc: "Create a Drive file from text" },
+  { slug: "GOOGLEDRIVE_FIND_FILE", toolkit: "googledrive", desc: "Find a file in Drive" },
+  { slug: "GMAIL_FETCH_EMAILS", toolkit: "gmail", desc: "Fetch recent Gmail emails" },
+  { slug: "GMAIL_SEND_EMAIL", toolkit: "gmail", desc: "Send an email via Gmail" },
+  { slug: "GMAIL_CREATE_EMAIL_DRAFT", toolkit: "gmail", desc: "Create a Gmail draft" },
+  { slug: "GOOGLEDOCS_CREATE_DOCUMENT", toolkit: "googledocs", desc: "Create a Google Doc" },
+  { slug: "GOOGLECALENDAR_CREATE_EVENT", toolkit: "googlecalendar", desc: "Create a Calendar event" },
+];
 
 const enc = encodeURIComponent;
 const die = (msg, code = 1) => { console.error(`error: ${msg}`); process.exit(code); };
@@ -73,6 +83,12 @@ function parseArgs(argv) {
 }
 const arr = (v) => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
 const allowedExt = (name) => KNOWLEDGE_TYPES.some((e) => name.toLowerCase().endsWith(e));
+// Accept either a toolkit ("googledrive") or a tool slug ("GOOGLEDRIVE_…") → toolkit.
+const toolkitFromArg = (a) => {
+  const hit = COMPOSIO_TOOLS.find((t) => t.slug === a);
+  if (hit) return hit.toolkit;
+  return a.includes("_") ? a.toLowerCase().split("_")[0] : a.toLowerCase();
+};
 
 const HELP = `iternal — manage ITERNAL agents from the terminal
 
@@ -83,6 +99,7 @@ Agents
   iternal agents get <id>
   iternal agents create --name "Name" [--prompt "…"] [--model gpt-5] [--description "…"]
                         [--tool "Browse Web"]…  [--composio GOOGLEDRIVE_CREATE_FILE_FROM_TEXT]…
+  iternal agents update <id> [--name "…"] [--prompt "…"] [--model "…"] [--description "…"]
   iternal agents delete <id>
 
 Scheduling
@@ -96,8 +113,9 @@ Knowledge base (RAG)
   iternal knowledge delete <agentId> <sourceId>
 
 Composio (external SaaS tools)
+  iternal composio tools                       # common tool slugs + their toolkit
   iternal composio connections
-  iternal composio connect <toolkit>          # e.g. googledrive — returns an OAuth URL
+  iternal composio connect <toolkit|slug>      # e.g. googledrive — returns an OAuth URL
 
 Other
   iternal models
@@ -150,23 +168,38 @@ async function main() {
       if (!rest[0]) die("usage: iternal agents get <id>");
       return out(await api("GET", `/api/apps/${enc(rest[0])}`));
     }
+    if (action === "update") {
+      if (!rest[0]) die("usage: iternal agents update <id> [--name …] [--prompt …] [--model …] [--description …]");
+      const patch = {};
+      for (const k of ["name", "prompt", "model", "description"]) {
+        if (flags[k] !== undefined && flags[k] !== "true") patch[k] = flags[k];
+      }
+      if (!Object.keys(patch).length) die("nothing to update — pass --name / --prompt / --model / --description");
+      await api("PUT", `/api/apps/${enc(rest[0])}`, patch);
+      return out(`Updated agent ${rest[0]} (${Object.keys(patch).join(", ")})`);
+    }
     if (action === "create") {
       if (!flags.name) die("--name is required");
       const created = await api("POST", "/api/apps", {
         name: flags.name, prompt: flags.prompt, model: flags.model || "gpt-5", description: flags.description,
       });
       const app = created.app || created;
-      const enabled = [];
+      const enabled = [], failed = [];
       for (const t of arr(flags.tool)) {
-        try { await api("POST", `/api/apps/${enc(app.id)}/actions`, { name: t, type: "BASIC" }); enabled.push(t); } catch { /* skip */ }
+        // The API accepts any BASIC name but only exact matches map to a real tool — validate here.
+        if (!BASIC_TOOLS.includes(t)) { failed.push(t); continue; }
+        try { await api("POST", `/api/apps/${enc(app.id)}/actions`, { name: t, type: "BASIC" }); enabled.push(t); } catch { failed.push(t); }
       }
       for (const slug of arr(flags.composio)) {
         try {
           await api("POST", `/api/apps/${enc(app.id)}/actions`, { name: slug, type: "COMPOSIO", requestBody: slug, description: `Composio ${slug}` });
           enabled.push(slug);
-        } catch { /* skip */ }
+        } catch { failed.push(slug); }
       }
-      return out(`Created agent "${app.name}" (${app.id})${enabled.length ? ` — tools: ${enabled.join(", ")}` : ""}`);
+      let msg = `Created agent "${app.name}" (${app.id})`;
+      if (enabled.length) msg += ` — tools: ${enabled.join(", ")}`;
+      if (failed.length) msg += `\nWARNING: rejected (check the exact name/slug): ${failed.join(", ")}`;
+      return out(msg);
     }
     if (action === "delete") {
       if (!rest[0]) die("usage: iternal agents delete <id>");
@@ -223,14 +256,16 @@ async function main() {
   }
 
   if (resource === "composio") {
+    if (action === "tools") return out(COMPOSIO_TOOLS);
     if (action === "connections") {
       const r = await api("GET", "/api/composio/connections");
       return out(r.connected || []);
     }
     if (action === "connect") {
-      if (!rest[0]) die("usage: iternal composio connect <toolkit>");
-      const r = await api("POST", "/api/composio/connect", { toolkit: rest[0] });
-      return out(r.redirect_url ? `Open this URL to connect "${rest[0]}":\n${r.redirect_url}` : JSON.stringify(r));
+      if (!rest[0]) die("usage: iternal composio connect <toolkit|slug>");
+      const toolkit = toolkitFromArg(rest[0]); // accepts "googledrive" or "GOOGLEDRIVE_…"
+      const r = await api("POST", "/api/composio/connect", { toolkit });
+      return out(r.redirect_url ? `Open this URL to connect "${toolkit}":\n${r.redirect_url}` : JSON.stringify(r));
     }
     die(`unknown: iternal composio ${action || ""}`);
   }

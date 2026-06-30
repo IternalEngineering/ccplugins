@@ -33,6 +33,23 @@ A simple notification plugin that plays a bell sound when tasks are completed.
 export ENABLE_BELL_NOTIFICATION=0
 ```
 
+### ITERNAL Agents (`iternal-agents`)
+
+A skill + bundled CLI for building and operating agents on the
+[ITERNAL Agent Platform](https://agents-iternal.icmserver008.com) directly from Claude Code.
+
+**Provides:**
+- A `iternal-agents` **skill** that teaches Claude to create/configure/schedule agents.
+- A zero-dependency **`iternal` CLI** (`plugins/iternal-agents/cli/iternal.mjs`) wrapping the
+  platform REST API: agents, schedules, knowledge base (RAG), and Composio tool connections.
+
+**Type:** Skill + CLI
+**Auth:** a personal access token via `ITERNAL_TOKEN` (Settings → Personal access tokens)
+
+**Usage:** ask Claude to "make an ITERNAL agent that …", "schedule it weekly", or "add a doc to its
+knowledge base" — the skill drives the bundled CLI. Composio tools (Drive/Gmail) require a one-time
+OAuth connection the skill walks you through.
+
 ## Plugin Structure
 
 Each plugin follows this structure:

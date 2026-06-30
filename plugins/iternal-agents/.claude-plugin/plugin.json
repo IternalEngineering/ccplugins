@@ -1,0 +1,9 @@
+{
+  "name": "iternal-agents",
+  "version": "0.1.0",
+  "description": "Create and manage ITERNAL agents, schedules, knowledge bases, and external-tool connections from Claude Code via the bundled iternal CLI.",
+  "author": {
+    "name": "Iternal",
+    "email": "barnaby@iternal.life"
+  }
+}

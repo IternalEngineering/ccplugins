@@ -19,6 +19,17 @@
       },
       "source": "./plugins/bells",
       "category": "productivity"
+    },
+    {
+      "name": "iternal-agents",
+      "description": "Create and manage ITERNAL agents, schedules, knowledge bases, and external-tool connections via the bundled iternal CLI.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Iternal",
+        "email": "barnaby@iternal.life"
+      },
+      "source": "./plugins/iternal-agents",
+      "category": "developer-tools"
     }
   ]
 }

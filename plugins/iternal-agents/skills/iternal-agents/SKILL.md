@@ -43,8 +43,24 @@ iternal tasks list <agentId> | delete <agentId> <taskId>
 iternal knowledge upload <agentId> --name doc.md [--text "…" | --file ./doc.md | --url https://…]
 iternal knowledge list <agentId> | delete <agentId> <sourceId>
 iternal composio tools | connections | connect <toolkit|slug>
+iternal triggers create <agentId> --name "…" --type … --action … [--config '{…}'] | list <agentId> | delete <agentId> <triggerId>
+iternal templates list | create <templateId> [--name "…"]
+iternal embed <agentId> [--size small|medium|large] [--position bottom-right|bottom-left]
 iternal models
 ```
+
+## Triggers, templates & embed
+
+- **Templates** — `iternal templates list` shows ~31 prebuilt agents; `iternal templates create <id>`
+  spins one up (optionally `--name` to rename). Fastest way to stand up a working agent.
+- **Triggers** (event automations) — `iternal triggers create <agentId> --name … --type T --action A --config '{…}'`.
+  `--type`: `CONVERSATION_ENDED` | `DATA_CAPTURED` | `KEYWORD_DETECTED` | `TIME_DELAY`.
+  `--action` + `--config`: `WEBHOOK` `{"url":"…","headers":{…}}` | `SLACK_WEBHOOK` `{"webhookUrl":"…"}` |
+  `EMAIL` `{"to":"…","subject":"…"}` | `LOG_EVENT` `{}` | `START_AGENT` `{"targetAppId":"…"}`.
+  `DATA_CAPTURED`/`KEYWORD_DETECTED` take `--conditions` (e.g. `'[{"keywords":["refund"]}]'`); `TIME_DELAY` takes `--delay <seconds>`.
+- **Embed** — `iternal embed <agentId>` prints the website widget code (floating-bubble script + inline
+  iframe) to paste into a site. `--size` and `--position` adjust it. (Multi-agent **workflows** are
+  built by chaining agents with `START_AGENT` triggers.)
 
 ## Tools & Composio slugs
 

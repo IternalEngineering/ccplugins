@@ -31,6 +31,9 @@ const COMPOSIO_TOOLS = [
   { slug: "GOOGLEDOCS_CREATE_DOCUMENT", toolkit: "googledocs", desc: "Create a Google Doc" },
   { slug: "GOOGLECALENDAR_CREATE_EVENT", toolkit: "googlecalendar", desc: "Create a Calendar event" },
 ];
+const TRIGGER_TYPES = ["CONVERSATION_ENDED", "DATA_CAPTURED", "KEYWORD_DETECTED", "TIME_DELAY"];
+const TRIGGER_ACTIONS = ["WEBHOOK", "EMAIL", "SLACK_WEBHOOK", "LOG_EVENT", "START_AGENT"];
+const EMBED_SIZES = { small: { w: 350, h: 500 }, medium: { w: 400, h: 600 }, large: { w: 450, h: 700 } };
 
 const enc = encodeURIComponent;
 const die = (msg, code = 1) => { console.error(`error: ${msg}`); process.exit(code); };
@@ -117,9 +120,23 @@ Composio (external SaaS tools)
   iternal composio connections
   iternal composio connect <toolkit|slug>      # e.g. googledrive — returns an OAuth URL
 
+Triggers (automations)
+  iternal triggers create <agentId> --name "…" --type CONVERSATION_ENDED --action LOG_EVENT
+                          [--config '{"url":"…"}'] [--conditions '[…]'] [--delay 3600]
+  iternal triggers list <agentId>
+  iternal triggers delete <agentId> <triggerId>
+
+Templates & embed
+  iternal templates list
+  iternal templates create <templateId> [--name "…"]
+  iternal embed <agentId> [--size small|medium|large] [--position bottom-right|bottom-left]
+
 Other
   iternal models
   iternal help
+
+Trigger types:   ${TRIGGER_TYPES.join(", ")}
+Trigger actions: ${TRIGGER_ACTIONS.join(", ")}
 
 Intervals:       ${INTERVALS.join(", ")}
 Built-in tools:  ${BASIC_TOOLS.join(", ")}`;
@@ -268,6 +285,73 @@ async function main() {
       return out(r.redirect_url ? `Open this URL to connect "${toolkit}":\n${r.redirect_url}` : JSON.stringify(r));
     }
     die(`unknown: iternal composio ${action || ""}`);
+  }
+
+  if (resource === "triggers") {
+    if (action === "create") {
+      const agentId = rest[0];
+      if (!agentId) die("usage: iternal triggers create <agentId> --name … --type … --action … [--config '{…}']");
+      if (!flags.name || !flags.type || !flags.action) die("--name, --type and --action are required");
+      if (!TRIGGER_TYPES.includes(flags.type)) die(`--type must be one of: ${TRIGGER_TYPES.join(", ")}`);
+      if (!TRIGGER_ACTIONS.includes(flags.action)) die(`--action must be one of: ${TRIGGER_ACTIONS.join(", ")}`);
+      const body = {
+        name: flags.name, type: flags.type, actionType: flags.action,
+        config: flags.config ? JSON.parse(flags.config) : {},
+        conditions: flags.conditions ? JSON.parse(flags.conditions) : [],
+      };
+      if (flags.delay !== undefined && flags.delay !== "true") body.delaySeconds = Number(flags.delay);
+      const r = await api("POST", `/api/apps/${enc(agentId)}/triggers`, body);
+      const t = r.trigger || r;
+      return out(`Created trigger "${flags.name}" (${flags.type} → ${flags.action})${t.id ? ` — id ${t.id}` : ""}`);
+    }
+    if (action === "list") {
+      if (!rest[0]) die("usage: iternal triggers list <agentId>");
+      const r = await api("GET", `/api/apps/${enc(rest[0])}/triggers`);
+      return out((r.triggers || []).map((t) => ({ id: t.id, name: t.name, type: t.type, actionType: t.actionType, enabled: t.enabled })));
+    }
+    if (action === "delete") {
+      const [agentId, triggerId] = rest;
+      if (!agentId || !triggerId) die("usage: iternal triggers delete <agentId> <triggerId>");
+      await api("DELETE", `/api/apps/${enc(agentId)}/triggers?triggerId=${enc(triggerId)}`);
+      return out(`Deleted trigger ${triggerId}`);
+    }
+    die(`unknown: iternal triggers ${action || ""}`);
+  }
+
+  if (resource === "templates") {
+    if (action === "list") {
+      const r = await api("GET", "/api/templates");
+      return out((r.templates || []).map((t) => ({ id: t.id, name: t.name, category: t.category, model: t.model })));
+    }
+    if (action === "create") {
+      const templateId = rest[0];
+      if (!templateId) die("usage: iternal templates create <templateId> [--name …]");
+      const r = await api("GET", "/api/templates");
+      const tpl = (r.templates || []).find((t) => t.id === templateId);
+      if (!tpl) die(`template "${templateId}" not found — run: iternal templates list`);
+      const created = await api("POST", "/api/apps", {
+        name: flags.name && flags.name !== "true" ? flags.name : tpl.name,
+        description: tpl.description, prompt: tpl.prompt, startingMessage: tpl.startingMessage,
+        conversationStarters: JSON.stringify(tpl.conversationStarters || []), model: tpl.model, icon: tpl.color,
+      });
+      const app = created.app || created;
+      return out(`Created agent "${app.name}" (${app.id}) from template "${templateId}"`);
+    }
+    die(`unknown: iternal templates ${action || ""}`);
+  }
+
+  if (resource === "embed") {
+    const agentId = action;
+    if (!agentId) die("usage: iternal embed <agentId> [--size small|medium|large] [--position bottom-right|bottom-left]");
+    const { w, h } = EMBED_SIZES[flags.size] || EMBED_SIZES.medium;
+    const side = flags.position === "bottom-left" ? "left" : "right";
+    const url = `${BASE}/widget/${enc(agentId)}`;
+    const script =
+      `<script>\n  (function() {\n    var iframe = document.createElement('iframe');\n    iframe.src = '${url}';\n` +
+      `    iframe.style.cssText = 'position:fixed;${side}:20px;bottom:20px;width:${w}px;height:${h}px;border:none;z-index:9999;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.12);';\n` +
+      `    iframe.allow = 'microphone';\n    document.body.appendChild(iframe);\n  })();\n</script>`;
+    const iframe = `<iframe src="${url}" width="${w}" height="${h}" style="border:none;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.12);" allow="microphone"></iframe>`;
+    return out(`Floating bubble (paste before </body>):\n${script}\n\nInline iframe:\n${iframe}`);
   }
 
   if (resource === "models") return out(MODELS);

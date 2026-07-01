@@ -41,6 +41,9 @@ const COMPOSIO_TOOLS = [
   { slug: "GMAIL_CREATE_EMAIL_DRAFT", toolkit: "gmail", desc: "Create a Gmail draft" },
   { slug: "GOOGLEDOCS_CREATE_DOCUMENT", toolkit: "googledocs", desc: "Create a Google Doc" },
   { slug: "GOOGLECALENDAR_CREATE_EVENT", toolkit: "googlecalendar", desc: "Create a Calendar event" },
+  { slug: "GOOGLESHEETS_CREATE_GOOGLE_SHEET1", toolkit: "googlesheets", desc: "Create a new Google spreadsheet" },
+  { slug: "GOOGLESHEETS_BATCH_UPDATE", toolkit: "googlesheets", desc: "Write values into a Google Sheets range" },
+  { slug: "GOOGLESHEETS_CREATE_SPREADSHEET_ROW", toolkit: "googlesheets", desc: "Append a row to a Google Sheet" },
 ];
 const TRIGGER_TYPES = ["CONVERSATION_ENDED", "DATA_CAPTURED", "KEYWORD_DETECTED", "TIME_DELAY"];
 const TRIGGER_ACTIONS = ["WEBHOOK", "EMAIL", "SLACK_WEBHOOK", "LOG_EVENT", "START_AGENT"];
@@ -209,7 +212,7 @@ async function main() {
     if (action === "create") {
       if (!flags.name) die("--name is required");
       const created = await api("POST", "/api/apps", {
-        name: flags.name, prompt: flags.prompt, model: flags.model || "gpt-5", description: flags.description,
+        name: flags.name, prompt: flags.prompt, model: flags.model || "minimax-m3", description: flags.description,
       });
       const app = created.app || created;
       const enabled = [], failed = [];

@@ -15,7 +15,18 @@ const INTERVALS = [
   "EVERY_5_MIN", "EVERY_15_MIN", "EVERY_30_MIN", "EVERY_HOUR",
   "EVERY_6_HOURS", "EVERY_12_HOURS", "DAILY", "WEEKLY",
 ];
-const BASIC_TOOLS = ["Browse Web", "URL Retrieval", "Search Knowledge Base"];
+const BASIC_TOOLS = [
+  "Browse Web",
+  "URL Retrieval",
+  "Search Knowledge Base",
+  "Read Document",
+  "Image Recognition",
+  "Analyse Visual",
+  "Document OCR",
+  "Image Generation",
+  "Video",
+  "Scheduled Tasks",
+];
 const MODELS = [
   "gpt-5", "gpt-5.1", "gpt-4.1", "o3", "gpt-4o",
   "claude-opus-4-8", "claude-sonnet-4-6", "claude-opus-4-5", "gemini-2.5-pro",

@@ -64,7 +64,7 @@ iternal models
 
 ## Tools & Composio slugs
 
-- **Built-in `--tool` names must be exact**: `Browse Web`, `URL Retrieval`, `Search Knowledge Base`
+- **Built-in `--tool` names must be exact**: `Browse Web`, `URL Retrieval`, `Search Knowledge Base`, `Read Document`, `Image Recognition`, `Analyse Visual`, `Document OCR`, `Image Generation`, `Video`, `Scheduled Tasks`
   (repeatable). A wrong name is **rejected** — always read the `create` output: confirm each tool is
   in the `— tools:` line, and that there is no `WARNING: rejected …` line.
 - **Composio `--composio` slugs**: discover valid ones with `iternal composio tools` (or the

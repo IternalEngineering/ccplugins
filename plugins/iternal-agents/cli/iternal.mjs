@@ -114,9 +114,10 @@ Auth (env):  ITERNAL_TOKEN=itl_pat_…   ITERNAL_API_URL=${BASE}
 Agents
   iternal agents list
   iternal agents get <id>
-  iternal agents create --name "Name" [--prompt "…"] [--model gpt-5] [--description "…"]
+  iternal agents create --name "Name" [--prompt "…"] [--model deepseek-v4] [--description "…"]
                         [--tool "Browse Web"]…  [--composio GOOGLEDRIVE_CREATE_FILE_FROM_TEXT]…
-  iternal agents update <id> [--name "…"] [--prompt "…"] [--model "…"] [--description "…"]
+                        [--output-schema '{"type":"object","properties":{…}}']
+  iternal agents update <id> [--name "…"] [--prompt "…"] [--model "…"] [--description "…"] [--output-schema '{…}']
   iternal agents delete <id>
 
 Scheduling
@@ -205,14 +206,24 @@ async function main() {
       for (const k of ["name", "prompt", "model", "description"]) {
         if (flags[k] !== undefined && flags[k] !== "true") patch[k] = flags[k];
       }
-      if (!Object.keys(patch).length) die("nothing to update — pass --name / --prompt / --model / --description");
+      if (flags["output-schema"] !== undefined && flags["output-schema"] !== "true") {
+        try { patch.outputSchema = JSON.parse(flags["output-schema"]); }
+        catch { die("--output-schema must be valid JSON (a JSON Schema object)"); }
+      }
+      if (!Object.keys(patch).length) die("nothing to update — pass --name / --prompt / --model / --description / --output-schema");
       await api("PUT", `/api/apps/${enc(rest[0])}`, patch);
       return out(`Updated agent ${rest[0]} (${Object.keys(patch).join(", ")})`);
     }
     if (action === "create") {
       if (!flags.name) die("--name is required");
+      let outputSchema;
+      if (flags["output-schema"] !== undefined && flags["output-schema"] !== "true") {
+        try { outputSchema = JSON.parse(flags["output-schema"]); }
+        catch { die("--output-schema must be valid JSON (a JSON Schema object)"); }
+      }
       const created = await api("POST", "/api/apps", {
         name: flags.name, prompt: flags.prompt, model: flags.model || "deepseek-v4", description: flags.description,
+        ...(outputSchema !== undefined ? { outputSchema } : {}),
       });
       const app = created.app || created;
       const enabled = [], failed = [];

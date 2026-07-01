@@ -1,13 +1,14 @@
 ---
 name: iternal-agents
-description: Create and manage agents, schedules, knowledge bases (RAG), and external-tool connections on the hosted ITERNAL Agent Platform via a personal access token. Use when the user wants to build, configure, schedule, or tear down an ITERNAL agent/app as an end-user — e.g. "make an ITERNAL agent that …", "schedule my agent weekly", "add docs to my agent's knowledge base", "connect Google Drive to my agent". Wraps the bundled `iternal` CLI.
+description: Create and manage agents, schedules, knowledge bases (RAG), and external-tool connections on the hosted ITERNAL Agent Platform via a personal access token. Use when the user wants to build, configure, schedule, or tear down an ITERNAL agent/app as an end-user — e.g. "make an ITERNAL agent that …", "schedule my agent weekly", "add docs to my agent's knowledge base", "connect Google Drive to my agent". NOT for editing this repo's platform source code. Wraps the `iternal` CLI.
 ---
 
 # ITERNAL agents
 
-Build and operate agents on the **ITERNAL Agent Platform**. An "agent" is an app with a prompt, a
-model, optional tools (built-in + external SaaS via Composio), an optional knowledge base, and
-optional schedules. This skill drives the `iternal` CLI bundled with the plugin.
+Build and operate agents on the **ITERNAL Agent Platform** with the `iternal` CLI. An "agent" is an
+app with a prompt, a model, optional tools (built-in + external SaaS via Composio), an optional
+knowledge base, and optional schedules. This drives the **live platform** via a PAT — it is not for
+editing the platform's own source code.
 
 ## Running the CLI — credentials on every call
 
@@ -15,29 +16,29 @@ Shell state does **not** persist between commands, so the token must be present 
 invocation. Either pass it inline:
 
 ```bash
-ITERNAL_TOKEN="itl_pat_…" node "$CLAUDE_PLUGIN_ROOT/cli/iternal.mjs" agents list
+ITERNAL_TOKEN="itl_pat_…" node cli/iternal.mjs agents list
 ```
 
 …or write an env file once and `source` it **in the same command** as each call:
 
 ```bash
 printf 'export ITERNAL_TOKEN=%q\nexport ITERNAL_API_URL=%q\n' "itl_pat_…" "https://agents-iternal.icmserver008.com" > .iternal.env
-source .iternal.env && node "$CLAUDE_PLUGIN_ROOT/cli/iternal.mjs" agents list
+source .iternal.env && node cli/iternal.mjs agents list
 ```
 
 - Token: platform → **Settings → Personal access tokens**. If it's missing, ask the user — never
   invent or hardcode a token.
 - `ITERNAL_API_URL` defaults to production; use `http://localhost:3001` for local dev.
-
-(Examples below write `iternal` for brevity — read it as `node "$CLAUDE_PLUGIN_ROOT/cli/iternal.mjs"`.)
+- `npm link` in `cli/` installs an `iternal` command so you can drop `node cli/iternal.mjs`.
 
 ## Commands
 
 ```
 iternal agents list | get <id> | delete <id>
-iternal agents create --name "Name" [--prompt "…"] [--model gpt-5] [--description "…"]
+iternal agents create --name "Name" [--prompt "…"] [--model deepseek-v4] [--description "…"]
                       [--tool "Browse Web"]…  [--composio GOOGLEDRIVE_CREATE_FILE_FROM_TEXT]…
-iternal agents update <id> [--name "…"] [--prompt "…"] [--model "…"] [--description "…"]
+                      [--output-schema '{"type":"object","properties":{…}}']   # → agent returns JSON
+iternal agents update <id> [--name "…"] [--prompt "…"] [--model "…"] [--description "…"] [--output-schema '{…}']
 iternal schedule <agentId> --name "…" --instruction "…" --interval WEEKLY
 iternal tasks list <agentId> | delete <agentId> <taskId>
 iternal knowledge upload <agentId> --name doc.md [--text "…" | --file ./doc.md | --url https://…]
@@ -64,9 +65,11 @@ iternal models
 
 ## Tools & Composio slugs
 
-- **Built-in `--tool` names must be exact**: `Browse Web`, `URL Retrieval`, `Search Knowledge Base`, `Read Document`, `Image Recognition`, `Analyse Visual`, `Document OCR`, `Image Generation`, `Video`, `Scheduled Tasks`
-  (repeatable). A wrong name is **rejected** — always read the `create` output: confirm each tool is
-  in the `— tools:` line, and that there is no `WARNING: rejected …` line.
+- **Built-in `--tool` names must be exact**: `Browse Web`, `URL Retrieval`, `Search Knowledge Base`,
+  `Read Document`, `Image Recognition`, `Analyse Visual`, `Document OCR` (Google Vision handwriting/
+  document OCR), `Image Generation`, `Video`, `Scheduled Tasks` (repeatable). A wrong name is
+  **rejected** — always read the `create` output: confirm each tool is in the `— tools:` line, and
+  that there is no `WARNING: rejected …` line.
 - **Composio `--composio` slugs**: discover valid ones with `iternal composio tools` (or the
   platform's Connect UI). Don't invent slugs — confirm an unfamiliar one with the user. Default model
   is `deepseek-v4` when `--model` is omitted (`iternal models` lists them).
@@ -104,4 +107,5 @@ iternal schedule cmr0… --name "Weekly AR brief" \
 - **Knowledge files** must be `.pdf/.txt/.md/.csv/.json`; `--file`/`--url` are guarded (no reading
   arbitrary local files, no private/loopback URLs).
 
-A PAT carries full account access — keep it secret; revoke it from Settings if leaked.
+A PAT carries full account access — keep it secret; revoke it from Settings if leaked. The same
+operations are also available via the ITERNAL **MCP server** for MCP clients.

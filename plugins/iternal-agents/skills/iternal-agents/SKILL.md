@@ -69,7 +69,7 @@ iternal models
   in the `— tools:` line, and that there is no `WARNING: rejected …` line.
 - **Composio `--composio` slugs**: discover valid ones with `iternal composio tools` (or the
   platform's Connect UI). Don't invent slugs — confirm an unfamiliar one with the user. Default model
-  is `minimax-m3` when `--model` is omitted (`iternal models` lists them).
+  is `deepseek-v4` when `--model` is omitted (`iternal models` lists them).
 
 ## Recipe: build → wire → connect → schedule
 

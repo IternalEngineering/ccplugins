@@ -212,7 +212,7 @@ async function main() {
     if (action === "create") {
       if (!flags.name) die("--name is required");
       const created = await api("POST", "/api/apps", {
-        name: flags.name, prompt: flags.prompt, model: flags.model || "minimax-m3", description: flags.description,
+        name: flags.name, prompt: flags.prompt, model: flags.model || "deepseek-v4", description: flags.description,
       });
       const app = created.app || created;
       const enabled = [], failed = [];

@@ -45,6 +45,8 @@ iternal knowledge upload <agentId> --name doc.md [--text "…" | --file ./doc.md
 iternal knowledge list <agentId> | delete <agentId> <sourceId>
 iternal composio tools | connections | connect <toolkit|slug>
 iternal triggers create <agentId> --name "…" --type … --action … [--config '{…}'] | list <agentId> | delete <agentId> <triggerId>
+iternal workflows list | create --name "…" --steps '[{"appId":"…"},…]' | run <id> [--input "…"]
+                 | status <runId> | runs <id> | delete <id>
 iternal templates list | create <templateId> [--name "…"]
 iternal embed <agentId> [--size small|medium|large] [--position bottom-right|bottom-left]
 iternal models
@@ -60,8 +62,14 @@ iternal models
   `EMAIL` `{"to":"…","subject":"…"}` | `LOG_EVENT` `{}` | `START_AGENT` `{"targetAppId":"…"}`.
   `DATA_CAPTURED`/`KEYWORD_DETECTED` take `--conditions` (e.g. `'[{"keywords":["refund"]}]'`); `TIME_DELAY` takes `--delay <seconds>`.
 - **Embed** — `iternal embed <agentId>` prints the website widget code (floating-bubble script + inline
-  iframe) to paste into a site. `--size` and `--position` adjust it. (Multi-agent **workflows** are
-  built by chaining agents with `START_AGENT` triggers.)
+  iframe) to paste into a site. `--size` and `--position` adjust it.
+- **Executable workflows** — `iternal workflows create` builds a multi-step pipeline over EXISTING
+  agents with typed hand-off (agents with an output schema pass validated JSON). Step fields:
+  `inputTemplate` (`{{input}}`/`{{previous}}`/`{{steps.<id>}}`/`{{item}}`), `routeKey`+`routes`
+  (conditional routing; a backward route forms a loop, capped by `maxVisits`, default 5),
+  `branches` (parallel fan-out, joined JSON object), `forEach` (one worker per item of the previous
+  step's JSON list), `next: null` (end here). `workflows run` is async — poll `workflows status <runId>`.
+  (Trigger-chained agents via `START_AGENT` are a separate, event-driven mechanism.)
 
 ## Tools & Composio slugs
 

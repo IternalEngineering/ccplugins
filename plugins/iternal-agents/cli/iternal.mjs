@@ -146,6 +146,12 @@ Templates & embed
   iternal templates create <templateId> [--name "…"]
   iternal embed <agentId> [--size small|medium|large] [--position bottom-right|bottom-left]
 
+Executable workflows (typed hand-off, routing, parallel, loops, per-item workers)
+  iternal workflows list
+  iternal workflows create --name "…" --steps '[{"appId":"…"},…]'   (run "workflows create" for step fields)
+  iternal workflows run <workflowId> [--input "…"]
+  iternal workflows status <runId> | runs <workflowId> | delete <workflowId>
+
 Other
   iternal models
   iternal help
@@ -377,6 +383,70 @@ async function main() {
       `    iframe.allow = 'microphone';\n    document.body.appendChild(iframe);\n  })();\n</script>`;
     const iframe = `<iframe src="${url}" width="${w}" height="${h}" style="border:none;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.12);" allow="microphone"></iframe>`;
     return out(`Floating bubble (paste before </body>):\n${script}\n\nInline iframe:\n${iframe}`);
+  }
+
+  if (resource === "workflows") {
+    if (action === "list" || !action) {
+      const r = await api("GET", "/api/workflows");
+      return out(
+        (r.workflows || [])
+          .map((w) => {
+            const steps = (w.definition?.steps || []).length;
+            const last = w.runs?.[0]?.status ?? "never run";
+            return `${w.id}  ${w.name} — ${steps} steps, last run: ${last}`;
+          })
+          .join("\n") || "No workflows."
+      );
+    }
+    if (action === "create") {
+      if (!flags.name) die("--name is required");
+      if (!flags.steps) die(`--steps is required: a JSON array of steps, e.g.
+  --steps '[{"appId":"<agentId>"},{"appId":"<agentId>","inputTemplate":"{{previous}}"}]'
+Step fields: id, appId, name, inputTemplate ({{input}}/{{previous}}/{{steps.<id>}}/{{item}}),
+routeKey+routes (conditional routing; '*'=fallback; may point backward = loop), next (null=end),
+maxVisits (loop cap, default 5), branches [{appId},…] (parallel fan-out),
+forEach {itemsKey,maxItems} (one worker per list item).`);
+      let steps;
+      try { steps = JSON.parse(flags.steps); } catch { die("--steps must be valid JSON"); }
+      const r = await api("POST", "/api/workflows", {
+        name: flags.name, description: flags.description, steps,
+      });
+      return out(`Created workflow "${r.workflow.name}" (${r.workflow.id})`);
+    }
+    if (action === "run") {
+      if (!rest[0]) die("usage: iternal workflows run <workflowId> [--input \"…\"]");
+      const r = await api("POST", `/api/workflows/${enc(rest[0])}/run`, { input: flags.input || "" });
+      return out(`Run started: ${r.runId}\nCheck it: iternal workflows status ${r.runId}`);
+    }
+    if (action === "status") {
+      if (!rest[0]) die("usage: iternal workflows status <runId>");
+      const r = await api("GET", `/api/workflows/runs/${enc(rest[0])}`);
+      const run = r.run;
+      const lines = [
+        `status: ${run.status}${run.error ? ` — ${run.error}` : ""} (${run.tokensUsed ?? 0} tokens)`,
+        ...run.steps.map((s) => {
+          const o = typeof s.output === "string" ? s.output : JSON.stringify(s.output);
+          return `  ${s.stepIndex + 1}. ${s.name}: ${s.status}${s.durationMs ? ` ${(s.durationMs / 1000).toFixed(1)}s` : ""}${s.error ? ` — ${s.error}` : ""}${o && s.status === "SUCCESS" ? ` → ${o.slice(0, 160)}` : ""}`;
+        }),
+        `final: ${(typeof run.output === "string" ? run.output : JSON.stringify(run.output) || "").slice(0, 400)}`,
+      ];
+      return out(lines.join("\n"));
+    }
+    if (action === "runs") {
+      if (!rest[0]) die("usage: iternal workflows runs <workflowId>");
+      const r = await api("GET", `/api/workflows/${enc(rest[0])}/runs`);
+      return out(
+        (r.runs || [])
+          .map((x) => `${x.id}  ${x.status}  ${x.startedAt}`)
+          .join("\n") || "No runs."
+      );
+    }
+    if (action === "delete") {
+      if (!rest[0]) die("usage: iternal workflows delete <workflowId>");
+      await api("DELETE", `/api/workflows/${enc(rest[0])}`);
+      return out(`Deleted workflow ${rest[0]}`);
+    }
+    die("usage: iternal workflows list|create|run|status|runs|delete");
   }
 
   if (resource === "models") return out(MODELS);
